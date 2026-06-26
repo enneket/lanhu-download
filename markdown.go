@@ -12,7 +12,7 @@ import (
 
 var reMultiBlank = regexp.MustCompile(`\n{3,}`)
 
-// ConvertHTMLToMarkdown 基于 Axure CSS 类名提取结构化 Markdown
+// ConvertHTMLToMarkdown 从 Axure HTML 提取结构化 Markdown
 func ConvertHTMLToMarkdown(htmlPath, pageName string) (string, error) {
 	f, err := os.Open(htmlPath)
 	if err != nil {
@@ -25,71 +25,18 @@ func ConvertHTMLToMarkdown(htmlPath, pageName string) (string, error) {
 		return "", fmt.Errorf("解析HTML失败: %w", err)
 	}
 
+	body := doc.Find("body")
+	if body.Length() == 0 {
+		return "", fmt.Errorf("未找到body元素")
+	}
+
 	var sb strings.Builder
 	sb.WriteString("# ")
 	sb.WriteString(pageName)
 	sb.WriteString("\n\n")
 
-	// 提取一级标题作为页面主标题
-	h1Seen := make(map[string]bool)
-	doc.Find("[class*='_一级标题']").Each(func(i int, s *goquery.Selection) {
-		text := extractText(s)
-		if text != "" && !h1Seen[text] {
-			h1Seen[text] = true
-			sb.WriteString("## ")
-			sb.WriteString(text)
-			sb.WriteString("\n\n")
-		}
-	})
-
-	// 提取二级标题作为子标题
-	h2Seen := make(map[string]bool)
-	doc.Find("[class*='_二级标题']").Each(func(i int, s *goquery.Selection) {
-		text := extractText(s)
-		if text != "" && !h2Seen[text] {
-			h2Seen[text] = true
-			sb.WriteString("### ")
-			sb.WriteString(text)
-			sb.WriteString("\n\n")
-		}
-	})
-
-	// 提取段落内容
-	paraSeen := make(map[string]bool)
-	doc.Find("[class*='_段落']").Each(func(i int, s *goquery.Selection) {
-		text := extractText(s)
-		if text != "" && !paraSeen[text] && len(text) > 2 {
-			paraSeen[text] = true
-			sb.WriteString(text)
-			sb.WriteString("\n\n")
-		}
-	})
-
-	// 提取表格
-	tables := extractTables(doc)
-	for _, table := range tables {
-		sb.WriteString(table)
-		sb.WriteString("\n\n")
-	}
-
-	// 提取表单字段
-	forms := extractFormFields(doc)
-	if len(forms) > 0 {
-		sb.WriteString("**表单字段:**\n\n")
-		for _, f := range forms {
-			sb.WriteString(f)
-			sb.WriteString("\n")
-		}
-		sb.WriteString("\n")
-	}
-
-	// 提取按钮
-	buttons := extractButtons(doc)
-	if len(buttons) > 0 {
-		sb.WriteString("**操作按钮:** ")
-		sb.WriteString(strings.Join(buttons, " | "))
-		sb.WriteString("\n\n")
-	}
+	// 递归遍历 DOM 树，按顺序提取内容
+	extractNode(body, &sb, 0)
 
 	// 清理
 	markdown := sb.String()
@@ -103,9 +50,157 @@ func ConvertHTMLToMarkdown(htmlPath, pageName string) (string, error) {
 	return markdown, nil
 }
 
-// extractText 从元素中提取文本（只取 _text 子元素）
-func extractText(s *goquery.Selection) string {
-	// 优先找 _text 子元素
+// extractNode 递归提取节点内容
+func extractNode(s *goquery.Selection, sb *strings.Builder, depth int) {
+	// 防止递归过深
+	if depth > 50 {
+		return
+	}
+
+	s.Contents().Each(func(i int, child *goquery.Selection) {
+		// 文本节点
+		if goquery.NodeName(child) == "#text" {
+			text := strings.TrimSpace(child.Text())
+			if text != "" {
+				sb.WriteString(text)
+				sb.WriteString(" ")
+			}
+			return
+		}
+
+		// 元素节点
+		tag := goquery.NodeName(child)
+		cls := child.AttrOr("class", "")
+
+		// 跳过隐藏元素
+		style := child.AttrOr("style", "")
+		if strings.Contains(style, "display:none") || strings.Contains(style, "visibility: hidden") {
+			return
+		}
+		if strings.Contains(cls, "ax_default_hidden") {
+			return
+		}
+
+		switch tag {
+		case "h1", "h2", "h3", "h4", "h5", "h6":
+			text := cleanText(child.Text())
+			if text != "" {
+				sb.WriteString("\n" + strings.Repeat("#", 4) + " " + text + "\n\n")
+			}
+			return
+
+		case "img":
+			alt := child.AttrOr("alt", "")
+			src := child.AttrOr("src", "")
+			if src != "" {
+				if alt == "" {
+					alt = "图片"
+				}
+				sb.WriteString(fmt.Sprintf("![%s](%s)\n\n", alt, src))
+			}
+			return
+
+		case "table":
+			extractTable(child, sb)
+			return
+
+		case "br":
+			sb.WriteString("\n")
+			return
+
+		case "hr":
+			sb.WriteString("\n---\n\n")
+			return
+		}
+
+		// 根据 class 处理特殊元素
+		switch {
+		case strings.Contains(cls, "_一级标题"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString("\n## " + text + "\n\n")
+			}
+			return
+
+		case strings.Contains(cls, "_二级标题"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString("\n### " + text + "\n\n")
+			}
+			return
+
+		case strings.Contains(cls, "_三级标题"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString("\n#### " + text + "\n\n")
+			}
+			return
+
+		case strings.Contains(cls, "_段落"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString(text + "\n\n")
+			}
+			return
+
+		case strings.Contains(cls, "label"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString("**" + text + ":** ")
+			}
+			return
+
+		case strings.Contains(cls, "link_button"), strings.Contains(cls, "primary_button"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString("`" + text + "` ")
+			}
+			return
+
+		case strings.Contains(cls, "checkbox"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString("- [ ] " + text + "\n")
+			}
+			return
+
+		case strings.Contains(cls, "radio_button"):
+			text := extractTextFromDiv(child)
+			checked := strings.Contains(cls, "selected")
+			if text != "" {
+				if checked {
+					sb.WriteString("- [x] " + text + "\n")
+				} else {
+					sb.WriteString("- [ ] " + text + "\n")
+				}
+			}
+			return
+
+		case strings.Contains(cls, "text_field1"), strings.Contains(cls, "droplist"):
+			text := extractTextFromDiv(child)
+			if text != "" {
+				sb.WriteString("`" + text + "`")
+			}
+			return
+		}
+
+		// 普通文本 div（没有特殊类名的）
+		if strings.Contains(cls, "text") && !strings.Contains(cls, "text_field") {
+			text := extractTextFromDiv(child)
+			if text != "" && len(text) > 1 {
+				sb.WriteString(text + "\n")
+			}
+			return
+		}
+
+		// 递归处理子节点
+		extractNode(child, sb, depth+1)
+	})
+}
+
+// extractTextFromDiv 从 div 中提取文本（只取 _text 子元素或直接文本）
+func extractTextFromDiv(s *goquery.Selection) string {
+	// 找 _text 子元素
 	textDiv := s.Find("[id$='_text']")
 	if textDiv.Length() > 0 {
 		text := strings.TrimSpace(textDiv.First().Text())
@@ -118,140 +213,83 @@ func extractText(s *goquery.Selection) string {
 	return text
 }
 
-// extractTables 提取表格内容
-func extractTables(doc *goquery.Document) []string {
-	var tables []string
+// extractTable 提取表格
+func extractTable(table *goquery.Selection, sb *strings.Builder) {
+	var rows [][]string
 
-	// 查找包含多个 table_cell 的容器
-	doc.Find("div").Each(func(i int, s *goquery.Selection) {
-		cells := s.Children().Filter(".table_cell")
-		if cells.Length() < 4 {
-			return
-		}
-
-		// 收集所有单元格文本
-		var rows [][]string
-		var currentRow []string
-
-		cells.Each(func(j int, cell *goquery.Selection) {
-			text := extractText(cell)
+	table.Find("tr").Each(func(i int, tr *goquery.Selection) {
+		var row []string
+		tr.Find("td, th").Each(func(j int, cell *goquery.Selection) {
+			text := cleanText(cell.Text())
 			if text == "" {
 				text = " "
 			}
-			currentRow = append(currentRow, text)
-
-			// 估算列数并分行
-			cols := estimateCols(cells.Length())
-			if len(currentRow) >= cols {
-				rows = append(rows, currentRow)
-				currentRow = nil
-			}
+			row = append(row, text)
 		})
-		if len(currentRow) > 0 {
-			rows = append(rows, currentRow)
+		if len(row) > 0 {
+			rows = append(rows, row)
 		}
-
-		if len(rows) < 2 {
-			return
-		}
-
-		// 生成 Markdown 表格
-		cols := len(rows[0])
-		var table strings.Builder
-		table.WriteString("|")
-		for c := 0; c < cols; c++ {
-			table.WriteString(" ")
-			if c < len(rows[0]) {
-				table.WriteString(rows[0][c])
-			}
-			table.WriteString(" |")
-		}
-		table.WriteString("\n|")
-		for c := 0; c < cols; c++ {
-			table.WriteString(" --- |")
-		}
-		table.WriteString("\n")
-		for r := 1; r < len(rows); r++ {
-			table.WriteString("|")
-			for c := 0; c < cols; c++ {
-				table.WriteString(" ")
-				if c < len(rows[r]) {
-					table.WriteString(rows[r][c])
-				}
-				table.WriteString(" |")
-			}
-			table.WriteString("\n")
-		}
-
-		tables = append(tables, table.String())
 	})
 
-	return tables
-}
+	if len(rows) == 0 {
+		// 可能是 Axure 的 table_cell 结构
+		table.Find(".table_cell").Each(func(i int, cell *goquery.Selection) {
+			text := cleanText(cell.Text())
+			if text == "" {
+				text = " "
+			}
+			// 简单按顺序排列
+			if len(rows) == 0 {
+				rows = append(rows, []string{})
+			}
+			rows[0] = append(rows[0], text)
+		})
+	}
 
-// estimateCols 估算表格列数
-func estimateCols(n int) int {
-	for _, cols := range []int{2, 3, 4, 5, 6, 7, 8} {
-		if n%cols == 0 && n/cols >= 2 {
-			return cols
+	if len(rows) < 2 {
+		return
+	}
+
+	// 生成 markdown 表格
+	cols := 0
+	for _, row := range rows {
+		if len(row) > cols {
+			cols = len(row)
 		}
 	}
-	return 4
+
+	sb.WriteString("\n|")
+	for c := 0; c < cols; c++ {
+		sb.WriteString(" ")
+		if c < len(rows[0]) {
+			sb.WriteString(rows[0][c])
+		}
+		sb.WriteString(" |")
+	}
+	sb.WriteString("\n|")
+	for c := 0; c < cols; c++ {
+		sb.WriteString(" --- |")
+	}
+	sb.WriteString("\n")
+	for r := 1; r < len(rows); r++ {
+		sb.WriteString("|")
+		for c := 0; c < cols; c++ {
+			sb.WriteString(" ")
+			if c < len(rows[r]) {
+				sb.WriteString(rows[r][c])
+			}
+			sb.WriteString(" |")
+		}
+		sb.WriteString("\n")
+	}
+	sb.WriteString("\n")
 }
 
-// extractFormFields 提取表单字段
-func extractFormFields(doc *goquery.Document) []string {
-	var fields []string
-	seen := make(map[string]bool)
-
-	doc.Find(".label").Each(func(i int, s *goquery.Selection) {
-		text := extractText(s)
-		if text == "" || seen[text] || len(text) > 30 {
-			return
-		}
-		seen[text] = true
-
-		// 查找相邻的输入/选择元素
-		parent := s.Parent()
-		val := ""
-		parent.Find(".text_field1, .droplist").Each(func(j int, inp *goquery.Selection) {
-			v := extractText(inp)
-			if v != "" {
-				val = v
-			}
-		})
-		// 检查选中的 radio/checkbox
-		parent.Find(".selected").Each(func(j int, sel *goquery.Selection) {
-			v := extractText(sel)
-			if v != "" {
-				val = v
-			}
-		})
-
-		if val != "" {
-			fields = append(fields, fmt.Sprintf("- **%s:** %s", text, val))
-		} else {
-			fields = append(fields, fmt.Sprintf("- **%s:** _（待填写）_", text))
-		}
-	})
-
-	return fields
-}
-
-// extractButtons 提取按钮
-func extractButtons(doc *goquery.Document) []string {
-	var buttons []string
-	seen := make(map[string]bool)
-
-	doc.Find(".link_button, .primary_button").Each(func(i int, s *goquery.Selection) {
-		text := extractText(s)
-		if text != "" && !seen[text] && len(text) < 20 {
-			buttons = append(buttons, fmt.Sprintf("[%s]", text))
-			seen[text] = true
-		}
-	})
-
-	return buttons
+// cleanText 清理文本
+func cleanText(text string) string {
+	text = strings.TrimSpace(text)
+	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+	return text
 }
 
 // ConvertAndSaveMarkdown 转换 HTML 为 Markdown 并保存
