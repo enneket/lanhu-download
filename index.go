@@ -66,12 +66,12 @@ h1 { text-align: center; margin-bottom: 24px; font-size: 22px; color: #1a1a1a; }
 		if p.Level > 0 {
 			indentClass = fmt.Sprintf(" class=\"indent-%d\"", min(p.Level, 2))
 		}
-		// 链接路径: <folder>/<page_name>/<filename>.html 或 <page_name>/<filename>.html
+		// 链接路径: html/<folder>/<page_name>/<filename>.html
 		pageDir := SanitizeFilename(p.Name)
 		if p.Folder != "" && p.Folder != "根目录" {
 			pageDir = SanitizeFilename(p.Folder) + "/" + pageDir
 		}
-		linkPath := pageDir + "/" + p.Filename
+		linkPath := "html/" + pageDir + "/" + p.Filename
 		sb.WriteString(fmt.Sprintf("<li%s><a href=\"%s\">%s</a></li>\n",
 			indentClass,
 			html.EscapeString(linkPath),

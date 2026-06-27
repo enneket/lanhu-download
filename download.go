@@ -150,16 +150,16 @@ func (d *Downloader) downloadPage(page PageItem, mapping *ProjectMapping) error 
 	return fmt.Errorf("页面缺少下载信息")
 }
 
-// pageDir 返回页面所在目录: output/<folder>/<page_name>/
+// pageDir 返回页面所在目录: output/html/<folder>/<page_name>/
 func (d *Downloader) pageDir(page PageItem) string {
 	pageName := SanitizeFilename(page.Name)
 	if page.Folder != "" && page.Folder != "根目录" {
-		return filepath.Join(d.outputDir, SanitizeFilename(page.Folder), pageName)
+		return filepath.Join(d.outputDir, "html", SanitizeFilename(page.Folder), pageName)
 	}
-	return filepath.Join(d.outputDir, pageName)
+	return filepath.Join(d.outputDir, "html", pageName)
 }
 
-// pageHTMLPath 返回页面 HTML 路径: output/<folder>/<page_name>/<filename>.html
+// pageHTMLPath 返回页面 HTML 路径: output/html/<folder>/<page_name>/<filename>.html
 func (d *Downloader) pageHTMLPath(page PageItem) string {
 	return filepath.Join(d.pageDir(page), page.Filename)
 }

@@ -106,17 +106,18 @@ func SanitizePNGPath(path string) string {
 	return filepath.Join(dir, base)
 }
 
-// ConvertAll 将 output 目录下所有页面目录中的 HTML 转为 PNG
+// ConvertAll 将 output/html 目录下所有 HTML 转为 PNG
 func ConvertAllToPNG(outputDir string, converter *PNGConverter) error {
 	fmt.Println("📸 转换PNG...")
 
-	// 遍历 output 目录，找到所有 HTML 文件
+	// 遍历 output/html 目录，找到所有 HTML 文件
+	htmlDir := filepath.Join(outputDir, "html")
 	var htmlFiles []string
-	filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(htmlDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".html") && info.Name() != "index.html" {
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".html") {
 			htmlFiles = append(htmlFiles, path)
 		}
 		return nil
@@ -134,8 +135,8 @@ func ConvertAllToPNG(outputDir string, converter *PNGConverter) error {
 
 	success := 0
 	for i, htmlPath := range htmlFiles {
-		// 保持目录结构
-		relPath, _ := filepath.Rel(outputDir, htmlPath)
+		// 保持目录结构: output/html/xxx.html → output/png/xxx.png
+		relPath, _ := filepath.Rel(htmlDir, htmlPath)
 		pngPath := filepath.Join(pngDir, strings.TrimSuffix(relPath, ".html")+".png")
 		pngPath = SanitizePNGPath(pngPath)
 
