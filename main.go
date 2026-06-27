@@ -14,6 +14,11 @@ func main() {
 		output      = flag.String("output", "", "输出目录 (默认: ./output/<文档名>)")
 		concurrency = flag.Int("concurrency", 5, "并发下载数")
 		singlePage  = flag.Bool("single", false, "只下载当前页面 (根据URL中的pageId)")
+		toPNG       = flag.Bool("png", false, "同时截图生成PNG")
+		pngWidth    = flag.Int("width", 1920, "PNG视口宽度")
+		pngHeight   = flag.Int("height", 1080, "PNG视口高度")
+		pngScale    = flag.Float64("scale", 2.0, "PNG缩放比例")
+		pngTimeout  = flag.Int("timeout", 30, "PNG截图超时(秒)")
 	)
 	flag.Parse()
 
@@ -81,6 +86,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// PNG 截图
+	if *toPNG {
+		converter := NewPNGConverter(*pngWidth, *pngHeight, *pngScale, true, *pngTimeout)
+		if err := ConvertAllToPNG(*output, converter); err != nil {
+			fmt.Fprintf(os.Stderr, "\n⚠️  PNG转换失败: %v\n", err)
+		}
+	}
+
 	fmt.Println("\n🎉 全部完成!")
 	fmt.Printf("📁 文件保存在: %s\n", *output)
 
@@ -104,6 +117,11 @@ func printUsage() {
   -output      输出目录 (默认: ./output)
   -concurrency 并发下载数 (默认: 5)
   -single      只下载URL中pageId对应的页面
+  -png         同时截图生成PNG
+  -width       PNG视口宽度 (默认: 1920)
+  -height      PNG视口高度 (默认: 1080)
+  -scale       PNG缩放比例 (默认: 2.0)
+  -timeout     PNG截图超时秒数 (默认: 30)
 
 环境变量:
   LANHU_COOKIE  蓝湖Cookie (可替代 -cookie 参数)
@@ -111,6 +129,7 @@ func printUsage() {
 示例:
   export LANHU_COOKIE="your_cookie_here"
   lanhu-download -url "https://lanhuapp.com/web/#/item/project/product?tid=xxx&pid=xxx&docId=xxx"
+  lanhu-download -url "蓝湖URL" -cookie "cookie" -png -scale 1
 
 获取Cookie:
   1. 浏览器登录 https://lanhuapp.com
