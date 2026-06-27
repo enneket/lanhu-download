@@ -14,7 +14,6 @@ func main() {
 		output      = flag.String("output", "", "输出目录 (默认: ./output/<文档名>)")
 		concurrency = flag.Int("concurrency", 5, "并发下载数")
 		singlePage  = flag.Bool("single", false, "只下载当前页面 (根据URL中的pageId)")
-		toMarkdown  = flag.Bool("markdown", false, "同时生成Markdown文件")
 	)
 	flag.Parse()
 
@@ -75,7 +74,7 @@ func main() {
 
 	// 创建下载器
 	client := NewLanhuClient(*cookie)
-	dl := NewDownloader(client, *output, *concurrency, *toMarkdown)
+	dl := NewDownloader(client, *output, *concurrency)
 
 	if err := dl.DownloadAll(params); err != nil {
 		fmt.Fprintf(os.Stderr, "\n❌ 下载失败: %v\n", err)
@@ -105,7 +104,6 @@ func printUsage() {
   -output      输出目录 (默认: ./output)
   -concurrency 并发下载数 (默认: 5)
   -single      只下载URL中pageId对应的页面
-  -markdown    同时生成Markdown文件
 
 环境变量:
   LANHU_COOKIE  蓝湖Cookie (可替代 -cookie 参数)
@@ -113,7 +111,6 @@ func printUsage() {
 示例:
   export LANHU_COOKIE="your_cookie_here"
   lanhu-download -url "https://lanhuapp.com/web/#/item/project/product?tid=xxx&pid=xxx&docId=xxx"
-  lanhu-download -url "蓝湖URL" -cookie "cookie" -single -markdown
 
 获取Cookie:
   1. 浏览器登录 https://lanhuapp.com
