@@ -53,23 +53,29 @@ h1 { text-align: center; margin-bottom: 24px; font-size: 22px; color: #1a1a1a; }
 
 	var currentFolder string
 	for _, p := range pages {
-		// 文件夹分组
-		if p.Folder != "" && p.Folder != currentFolder && p.Folder != "根目录" {
+		// 从 DirPath 提取顶级目录作为分组
+		topFolder := ""
+		if p.DirPath != "" {
+			parts := strings.SplitN(p.DirPath, "/", 2)
+			topFolder = parts[0]
+		}
+
+		if topFolder != "" && topFolder != currentFolder {
 			if currentFolder != "" {
 				sb.WriteString("</ul></div>\n")
 			}
-			currentFolder = p.Folder
-			sb.WriteString(fmt.Sprintf("<div class=\"folder\"><div class=\"folder-name\">%s</div><ul class=\"page-list\">\n", html.EscapeString(p.Folder)))
+			currentFolder = topFolder
+			sb.WriteString(fmt.Sprintf("<div class=\"folder\"><div class=\"folder-name\">%s</div><ul class=\"page-list\">\n", html.EscapeString(topFolder)))
 		}
 
 		indentClass := ""
-		if p.Level > 0 {
-			indentClass = fmt.Sprintf(" class=\"indent-%d\"", min(p.Level, 2))
+		if p.Level > 1 {
+			indentClass = fmt.Sprintf(" class=\"indent-%d\"", min(p.Level-1, 2))
 		}
-		// 链接路径: html/<folder>/<page_name>/<filename>.html
+		// 链接路径: html/<DirPath>/<page_name>/<filename>.html
 		pageDir := SanitizeFilename(p.Name)
-		if p.Folder != "" && p.Folder != "根目录" {
-			pageDir = SanitizeFilename(p.Folder) + "/" + pageDir
+		if p.DirPath != "" {
+			pageDir = SanitizeDirPath(p.DirPath) + "/" + pageDir
 		}
 		linkPath := "html/" + pageDir + "/" + p.Filename
 		sb.WriteString(fmt.Sprintf("<li%s><a href=\"%s\">%s</a></li>\n",

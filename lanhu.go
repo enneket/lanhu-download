@@ -274,5 +274,5 @@ type PageItem struct {
 	Name     string // 页面名称
 	Filename string // HTML 文件名 (如 "abc123.html")
 	Level    int    // 层级深度
-	Folder   string // 所属文件夹
+	DirPath  string // 完整目录路径 (如 "后台/APP商城配置")
 }

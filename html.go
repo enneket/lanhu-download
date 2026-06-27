@@ -96,3 +96,12 @@ func SanitizeFilename(name string) string {
 	)
 	return replacer.Replace(name)
 }
+
+// SanitizeDirPath 清理目录路径中的特殊字符（保留 / 分隔符）
+func SanitizeDirPath(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = SanitizeFilename(part)
+	}
+	return strings.Join(parts, "/")
+}

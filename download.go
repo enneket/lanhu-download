@@ -150,11 +150,11 @@ func (d *Downloader) downloadPage(page PageItem, mapping *ProjectMapping) error 
 	return fmt.Errorf("页面缺少下载信息")
 }
 
-// pageDir 返回页面所在目录: output/html/<folder>/<page_name>/
+// pageDir 返回页面所在目录: output/html/<DirPath>/<page_name>/
 func (d *Downloader) pageDir(page PageItem) string {
 	pageName := SanitizeFilename(page.Name)
-	if page.Folder != "" && page.Folder != "根目录" {
-		return filepath.Join(d.outputDir, "html", SanitizeFilename(page.Folder), pageName)
+	if page.DirPath != "" {
+		return filepath.Join(d.outputDir, "html", SanitizeDirPath(page.DirPath), pageName)
 	}
 	return filepath.Join(d.outputDir, "html", pageName)
 }
@@ -282,7 +282,7 @@ func extractPages(mapping *ProjectMapping) []PageItem {
 	var pages []PageItem
 	if mapping.Sitemap != nil {
 		for _, node := range mapping.Sitemap.RootNodes {
-			collectPages(node, &pages, "", 0, "")
+			collectPages(node, &pages, "", 0)
 		}
 	}
 	// 如果 sitemap 为空，从 pages dict 构建
@@ -300,28 +300,26 @@ func extractPages(mapping *ProjectMapping) []PageItem {
 	return pages
 }
 
-func collectPages(node SitemapNode, pages *[]PageItem, parentPath string, level int, folder string) {
+func collectPages(node SitemapNode, pages *[]PageItem, parentPath string, level int) {
+	// 构建当前节点的完整路径
 	currentPath := node.PageName
 	if parentPath != "" {
 		currentPath = parentPath + "/" + node.PageName
 	}
 
 	if node.PageName != "" && node.URL != "" {
+		// 有 URL 的节点是页面，目录路径 = 父级路径
 		*pages = append(*pages, PageItem{
 			Name:     node.PageName,
 			Filename: node.URL,
 			Level:    level,
-			Folder:   folder,
+			DirPath:  parentPath,
 		})
 	}
 
 	// 递归子节点
 	for _, child := range node.Children {
-		nextFolder := folder
-		if node.Type == "Folder" && node.URL == "" {
-			nextFolder = node.PageName
-		}
-		collectPages(child, pages, currentPath, level+1, nextFolder)
+		collectPages(child, pages, currentPath, level+1)
 	}
 }
 
@@ -333,7 +331,7 @@ func filterByPageID(mapping *ProjectMapping, pages []PageItem, pageID string) []
 			if found := findNodeByID(node, pageID); found != nil {
 				// 找到了，收集该节点下的所有页面
 				var filtered []PageItem
-				collectPages(*found, &filtered, "", 0, "")
+				collectPages(*found, &filtered, "", 0)
 				if len(filtered) > 0 {
 					return filtered
 				}
