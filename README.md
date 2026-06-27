@@ -16,6 +16,24 @@ go install github.com/enneket/lanhu-download@latest
 2. `F12` → Network → 刷新页面
 3. 点击任意请求，复制请求头中的 `Cookie` 值
 
+## 配置
+
+复制 `.env.example` 为 `.env`，填入 Cookie：
+
+```bash
+cp .env.example .env
+```
+
+```
+LANHU_COOKIE=your_cookie_here
+```
+
+支持的环境变量：
+
+| 变量 | 说明 |
+|------|------|
+| `LANHU_COOKIE` | 蓝湖 Cookie（必填） |
+
 ## 用法
 
 ```bash
