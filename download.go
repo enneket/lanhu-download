@@ -57,8 +57,8 @@ func (d *Downloader) DownloadAll(params *URLParams) error {
 
 	fmt.Printf("📄 共 %d 个页面\n", len(pages))
 
-	// 4. 如果指定了 pageId，只下载该页面
-	if params.PageID != "" {
+	// 4. 如果指定了 -single 且有 pageId，只下载该页面
+	if params.PageID != "" && params.SinglePage {
 		filtered := filterByPageID(mapping, pages, params.PageID)
 		if len(filtered) == 0 {
 			fmt.Printf("⚠️  未找到 pageId=%s 对应的页面，下载全部页面\n", params.PageID)

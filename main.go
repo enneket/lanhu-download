@@ -57,6 +57,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "❌ -single 模式需要URL中包含 pageId 参数")
 		os.Exit(1)
 	}
+	params.SinglePage = *singlePage
 
 	// 默认输出目录
 	if *output == "" {

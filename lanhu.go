@@ -16,11 +16,12 @@ const (
 )
 
 type URLParams struct {
-	TeamID    string
-	ProjectID string
-	DocID     string
-	VersionID string
-	PageID    string
+	TeamID     string
+	ProjectID  string
+	DocID      string
+	VersionID  string
+	PageID     string
+	SinglePage bool
 }
 
 type LanhuClient struct {
